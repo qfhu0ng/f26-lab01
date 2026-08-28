@@ -3,6 +3,7 @@ package edu.cmu.cs214.booking.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
+import edu.cmu.cs214.booking.domain.Booking;
 import edu.cmu.cs214.booking.domain.Room;
 import edu.cmu.cs214.booking.domain.TimeInterval;
 import edu.cmu.cs214.booking.domain.User;
@@ -87,5 +88,26 @@ class BookingServiceTest {
 
         assertEquals(List.of(confirmed.booking()), store.allBookings());
         assertEquals(waitlistBefore, store.waitlistForRoom(roomA));
+    }
+
+    @Test
+    void cancelBookingPromotesWaitlistedUser() {
+        InMemoryBookingStore store = new InMemoryBookingStore();
+        BookingService svc = new BookingService(store);
+        BookingResult.Confirmed cancelled = assertInstanceOf(BookingResult.Confirmed.class,
+                svc.book(roomA, alice, new TimeInterval(600, 660)));
+        TimeInterval requestedInterval = new TimeInterval(630, 700);
+        assertInstanceOf(BookingResult.Waitlisted.class,
+                svc.book(roomA, bob, requestedInterval));
+
+        svc.cancelBooking(cancelled.booking().id());
+
+        List<Booking> bookings = svc.listBookings(roomA);
+        assertEquals(1, bookings.size());
+        Booking promoted = bookings.get(0);
+        assertEquals(bob, promoted.user());
+        assertEquals(roomA, promoted.room());
+        assertEquals(requestedInterval, promoted.interval());
+        assertEquals(List.of(), store.waitlistForRoom(roomA));
     }
 }

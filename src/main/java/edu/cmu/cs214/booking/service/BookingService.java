@@ -6,6 +6,7 @@ import edu.cmu.cs214.booking.domain.TimeInterval;
 import edu.cmu.cs214.booking.domain.User;
 import edu.cmu.cs214.booking.domain.WaitlistEntry;
 import edu.cmu.cs214.booking.repo.BookingStore;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,13 +44,34 @@ public class BookingService {
         return new BookingResult.Confirmed(booking);
     }
 
-    /** Cancels a confirmed booking; unknown IDs are ignored. */
+    /**
+     * Cancels a confirmed booking and promotes at most one eligible waiter, in
+     * arrival order. Unknown booking IDs are ignored.
+     */
     public void cancelBooking(String bookingId) {
         Optional<Booking> booking = store.findBooking(bookingId);
         if (booking.isEmpty()) {
             return;
         }
+        Room room = booking.get().room();
         store.removeBooking(bookingId);
+
+        List<Booking> remainingBookings = store.bookingsForRoom(room);
+        List<WaitlistEntry> candidates = store.waitlistForRoom(room).stream()
+                .sorted(Comparator.comparingInt(WaitlistEntry::seq))
+                .toList();
+        for (WaitlistEntry candidate : candidates) {
+            boolean overlaps = remainingBookings.stream()
+                    .anyMatch(existing -> existing.interval().overlaps(candidate.interval()));
+            if (overlaps) {
+                continue;
+            }
+            Booking promoted = new Booking("b" + nextBookingSeq++, room,
+                    candidate.user(), candidate.interval());
+            store.addBooking(promoted);
+            store.removeWaitlistEntry(candidate.id());
+            return;
+        }
     }
 
     /** Returns the confirmed bookings for {@code room}. */
