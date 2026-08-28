@@ -1,27 +1,23 @@
 #!/usr/bin/env bash
-# export-transcripts.sh: copy your Claude Code transcripts into transcripts/
-# in this repository, ready to review and commit.
-#
-# What it does:
-#   1. Finds the Claude Code sessions that ran inside this repository, under
-#      ~/.claude/projects/ (or $CLAUDE_CONFIG_DIR/projects if you set that).
-#   2. Copies each session file (and its subagent transcripts, if any) into
-#      transcripts/ at the repository root.
-#   3. You review the result, then commit and push it like any other file.
+# Export agent sessions into the local, Git-ignored transcripts/ directory.
+# Codex is the default. Claude Code remains available with --claude.
+# For this public Lab 1 fork, NEVER commit or push the transcripts.
 #
 # Usage (from anywhere inside your course repository):
-#   ./tools/export-transcripts.sh
+#   ./tools/export-transcripts.sh --codex --session <task-id>
+#   ./tools/export-transcripts.sh          # uses CODEX_THREAD_ID inside Codex
+#   ./tools/export-transcripts.sh --claude
 #
 # Notes:
+#   - Codex export requires Python 3.9+ and uses only the selected task's
+#     saved session logs; it excludes the current unfinished turn.
+#   - A rerun replaces the selected task's previous exported snapshot.
 #   - Windows: run this from Git Bash or WSL.
 #   - Sessions are stored on the machine where you ran the agent. If you
 #     worked on more than one machine, run this script on each of them.
-#   - Only sessions started inside this repository are exported. Start
-#     Claude Code from the repository root and this finds everything.
-#   - If you use a different agent tool, this script does not apply: you are
-#     responsible for exporting an equivalent transcript (see policies.md).
+#   - Claude mode selects sessions started inside this repository.
 #   - Review the exported files for accidentally personal content before
-#     committing. The redaction rule is in policies.md.
+#     showing them locally to your TA.
 #
 # INVARIANT for anyone revising this script: it exports session logs ONLY,
 # never the memory/ directory that lives alongside them (auto-memory can
@@ -31,10 +27,31 @@
 
 set -euo pipefail
 
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+    echo "Usage: $0 [--codex] [--session TASK_ID]"
+    echo "       $0 --claude"
+    echo "Codex uses CODEX_THREAD_ID when --session is omitted. Requires Python 3.9+."
+    echo "Transcripts stay local: do not commit or push them for Lab 1."
+    exit 0
+fi
+
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
     echo "error: this is not a git repository. Run the script from inside your course repository." >&2
     exit 1
 }
+
+if [ "${1:-}" != "--claude" ]; then
+    if [ "${1:-}" = "--codex" ]; then
+        shift
+    fi
+    SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+    exec python3 "$SCRIPT_DIR/export-codex-transcripts.py" --repo-root "$REPO_ROOT" "$@"
+fi
+shift
+if [ "$#" -ne 0 ]; then
+    echo "error: --claude does not accept additional arguments." >&2
+    exit 1
+fi
 
 CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 PROJECTS_DIR="$CLAUDE_DIR/projects"
@@ -104,5 +121,5 @@ fi
 echo
 echo "Next steps:"
 echo "  1. Skim the exported files for anything accidentally personal (see policies.md)."
-echo "  2. git add transcripts && git commit -m \"Add agent transcripts\""
-echo "  3. git push"
+echo "  2. Show the local exported files to your TA at recitation."
+echo "Do not commit or push transcripts for this public Lab 1 fork."
