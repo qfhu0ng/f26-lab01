@@ -7,6 +7,7 @@ import edu.cmu.cs214.booking.domain.Room;
 import edu.cmu.cs214.booking.domain.TimeInterval;
 import edu.cmu.cs214.booking.domain.User;
 import edu.cmu.cs214.booking.repo.InMemoryBookingStore;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class BookingServiceTest {
@@ -57,5 +58,34 @@ class BookingServiceTest {
         svc.book(roomA, alice, new TimeInterval(600, 660));
         svc.book(roomA, bob, new TimeInterval(660, 720));
         assertEquals(2, svc.listBookings(roomA).size());
+    }
+
+    @Test
+    void cancelBookingRemovesOnlyTheRequestedBooking() {
+        BookingService svc = newService();
+        BookingResult.Confirmed cancelled = assertInstanceOf(BookingResult.Confirmed.class,
+                svc.book(roomA, alice, new TimeInterval(600, 660)));
+        BookingResult.Confirmed remaining = assertInstanceOf(BookingResult.Confirmed.class,
+                svc.book(roomA, bob, new TimeInterval(660, 720)));
+
+        svc.cancelBooking(cancelled.booking().id());
+
+        assertEquals(List.of(remaining.booking()), svc.listBookings(roomA));
+    }
+
+    @Test
+    void cancelUnknownBookingLeavesBookingsAndWaitlistUnchanged() {
+        InMemoryBookingStore store = new InMemoryBookingStore();
+        BookingService svc = new BookingService(store);
+        BookingResult.Confirmed confirmed = assertInstanceOf(BookingResult.Confirmed.class,
+                svc.book(roomA, alice, new TimeInterval(600, 660)));
+        assertInstanceOf(BookingResult.Waitlisted.class,
+                svc.book(roomA, bob, new TimeInterval(600, 660)));
+        var waitlistBefore = store.waitlistForRoom(roomA);
+
+        svc.cancelBooking("missing");
+
+        assertEquals(List.of(confirmed.booking()), store.allBookings());
+        assertEquals(waitlistBefore, store.waitlistForRoom(roomA));
     }
 }
