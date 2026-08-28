@@ -3,6 +3,8 @@
 A small room-booking service. Users book rooms for time intervals, and if a room is
 taken they land on a waitlist. It is the codebase you work in for Lab 1.
 
+AI assistance: OpenAI Codex desktop app (model: `gpt-5.6-sol`).
+
 **Read `ARCHITECTURE.md` first.** It maps the three layers (domain / service / repo)
 so you do not have to cold-read every file.
 
