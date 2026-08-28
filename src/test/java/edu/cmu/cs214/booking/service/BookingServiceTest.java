@@ -1,6 +1,7 @@
 package edu.cmu.cs214.booking.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -211,5 +212,54 @@ class BookingServiceTest {
         assertEquals(List.of(), store.waitlistForRoom(roomA));
         assertEquals(roomBBookingsBefore, svc.listBookings(roomB));
         assertEquals(roomBWaitlistBefore, store.waitlistForRoom(roomB));
+    }
+
+    @Test
+    void isAvailableWhenRoomHasNoBookings() {
+        BookingService svc = newService();
+
+        assertTrue(svc.isAvailable(roomA, new TimeInterval(600, 660)));
+    }
+
+    @Test
+    void isAvailableIgnoresBookingsInOtherRooms() {
+        BookingService svc = newService();
+        svc.book(roomA, alice, new TimeInterval(600, 660));
+
+        assertTrue(svc.isAvailable(roomB, new TimeInterval(600, 660)));
+    }
+
+    @Test
+    void isAvailableRejectsOverlapWithLaterListedBooking() {
+        BookingService svc = newService();
+        svc.book(roomA, alice, new TimeInterval(480, 540));
+        svc.book(roomA, bob, new TimeInterval(600, 660));
+
+        assertFalse(svc.isAvailable(roomA, new TimeInterval(570, 630)));
+    }
+
+    @Test
+    void isAvailableRejectsOverlapWithBookingStartingEarlier() {
+        BookingService svc = newService();
+        svc.book(roomA, alice, new TimeInterval(600, 660));
+
+        assertFalse(svc.isAvailable(roomA, new TimeInterval(630, 690)));
+    }
+
+    @Test
+    void isAvailableRejectsRequestContainedInExistingBooking() {
+        BookingService svc = newService();
+        svc.book(roomA, alice, new TimeInterval(600, 720));
+
+        assertFalse(svc.isAvailable(roomA, new TimeInterval(630, 660)));
+    }
+
+    @Test
+    void isAvailableAllowsBackToBackIntervals() {
+        BookingService svc = newService();
+        svc.book(roomA, alice, new TimeInterval(600, 660));
+
+        assertTrue(svc.isAvailable(roomA, new TimeInterval(540, 600)));
+        assertTrue(svc.isAvailable(roomA, new TimeInterval(660, 720)));
     }
 }
